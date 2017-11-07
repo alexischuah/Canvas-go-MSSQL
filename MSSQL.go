@@ -1,6 +1,7 @@
 package main
 
 import (
+    "strconv"
     "fmt"
     "flag"
     "os"
@@ -54,16 +55,44 @@ func getHeader(fileName string, body []byte) (string, gjson.Result) {
 
     return tableName, result
 }
-/*
-//write script for processing create columns and column type
-func createSQL(tableName string, headers gjson.Result){
 
-    f, err := os.Create("createTables.sql")
-    check(err)
-    defer f.Close()
+//write script for processing create columns and column type
+func createSQL(schema []byte, tableName string){
+
+    f, err := os.OpenFile("createTables.sql", os.O_APPEND | os.O_WRONLY | os.O_CREATE, 0644)
+
+    if err != nil {
+        panic(err)
+    }
     
+    schPath := "schema." + tableName + ".columns"
+    colCount := int(gjson.GetBytes(schema, schPath + ".#").Int())
+
+    createQuery := "CREATE TABLE " + tableName + "\n("
+
+    var colName string
+    var colType string
+    for i:=0; i<colCount; i++ {
+        colName = gjson.GetBytes(schema, schPath + "." + strconv.Itoa(i) + ".name").String()
+        colType = gjson.GetBytes(schema, schPath + "." + strconv.Itoa(i) + ".type").String()
+        createQuery = createQuery + "\n\t" + colName + "\t" + colType 
+        if i<colCount-1 {
+            createQuery = createQuery + ","
+        }
+    }
+    
+    createQuery = createQuery + "\n);\n"
+
+    _, err = f.WriteString(createQuery)
+    
+    if err!= nil{
+        panic(err)
+    }
+    
+    f.Close()
+    //fmt.Println(createQuery)
 }
-*/
+
 //Create new tab delimited file with headers.
 func newTable(tableName string, fileName string, headers gjson.Result){
 
@@ -117,7 +146,7 @@ func prepFiles() {
         newTable(tableName, fileName, headers)
     }
 
-    //CreateSQL(tableName, headers)
+        createSQL(schema, "account")
 }
 
 //Read zip file, return contents
